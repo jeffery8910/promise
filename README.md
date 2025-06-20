@@ -1,5 +1,5 @@
 深入淺出 Promise 與 React Suspense - 互動式教學網站
-(Live Demo)[https://jeffery8910.github.io/promise/]
+[Live Demo](https://jeffery8910.github.io/promise/)
 這是一個專為解釋 throw new Promise(() => {}) 概念而設計的互動式單頁面教學網站。透過實際操作與視覺化呈現，讓開發者能深刻理解這個看似奇特卻十分有用的 JavaScript/React 技巧。
 
 🚀 這個專案解決了什麼問題？

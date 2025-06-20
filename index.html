@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深入淺出 Promise 與 React Suspense</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        .step-card {
+            background-color: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            margin-bottom: 2.5rem;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease-in-out;
+        }
+        .step-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        .step-number {
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 9999px;
+            width: 3rem;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-right: 1.5rem;
+            flex-shrink: 0;
+        }
+        .code-block {
+            background-color: #1f2937;
+            color: #d1d5db;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: auto;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .button {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 500;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+            margin-right: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .button:hover {
+            background-color: #2563eb;
+        }
+        .button-secondary {
+            background-color: #4b5563;
+        }
+        .button-secondary:hover {
+            background-color: #374151;
+        }
+         .button-negative {
+            background-color: #ef4444;
+        }
+        .button-negative:hover {
+            background-color: #dc2626;
+        }
+        .status-box {
+            border: 2px dashed #9ca3af;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+            transition: all 0.3s ease;
+        }
+        .status-pending { color: #f59e0b; border-color: #f59e0b; }
+        .status-fulfilled { color: #22c55e; border-color: #22c55e; }
+        .status-rejected { color: #ef4444; border-color: #ef4444; }
+
+        .suspense-container {
+            border: 2px solid #6366f1;
+            padding: 2rem;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #f9fafb, #e5e7eb);
+            margin-top: 1.5rem;
+        }
+        .fallback-ui {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #4f46e5;
+            height: 150px;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #4f46e5;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-blue-600 mb-2">深入淺出 Promise 與 React Suspense</h1>
+            <p class="text-lg text-gray-600">一個關於「永遠等待」的 Promise 的互動故事</p>
+        </header>
+
+        <main>
+            <!-- 步驟一：正常的 Promise -->
+            <div class="step-card">
+                <div class="flex items-start">
+                    <div class="step-number">1</div>
+                    <div>
+                        <h2 class="text-3xl font-bold mb-2">一切的起點：正常的 Promise</h2>
+                        <p class="text-gray-600">在深入之前，我們先複習一下 Promise 是什麼。想像它是一個「承諾」，保證在未來某個時間點會給你一個結果，可能是「成功」或「失敗」。</p>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <pre><code>const myPromise = new Promise((resolve, reject) => {
+  // 這裡執行一些需要時間的工作，例如跟伺服器要資料
+  // ... 工作完成後 ...
+  // 如果成功，就呼叫 resolve()
+  // 如果失敗，就呼叫 reject()
+});</code></pre>
+                </div>
+                
+                <p>下面我們來模擬一下。點擊按鈕，看看這個 Promise 的狀態如何變化：</p>
+                
+                <div class="mt-4">
+                    <button class="button" onclick="runNormalPromise(true)">執行成功 (Resolve)</button>
+                    <button class="button button-negative" onclick="runNormalPromise(false)">執行失敗 (Reject)</button>
+                </div>
+
+                <div id="status-box-1" class="status-box status-pending">
+                    狀態: ⏳ 等待中 (Pending)
+                </div>
+            </div>
+
+            <!-- 步驟二：空 Executor 的 Promise -->
+            <div class="step-card">
+                <div class="flex items-start">
+                    <div class="step-number">2</div>
+                    <div>
+                        <h2 class="text-3xl font-bold mb-2">一個奇特的 Promise：() => {}</h2>
+                        <p class="text-gray-600">現在，來看我們今天的主角。如果我們給 `new Promise` 一個空的函式會發生什麼事？</p>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <pre><code>const endlessPromise = new Promise(() => {});
+
+// 這個函式裡面...
+// - 沒有呼叫 resolve()
+// - 沒有呼叫 reject()
+// - 什麼事都沒做！</code></pre>
+                </div>
+                
+                <p>這個 Promise 就像一個說了「我保證」卻從不給出結果的朋友。它既不說成功，也不說失敗。因此，它會永遠處於「等待中」(Pending) 的狀態。點擊下方按鈕來建立它，你會發現它的狀態永遠不會改變。</p>
+
+                <div class="mt-4">
+                    <button class="button button-secondary" onclick="createEndlessPromise()">建立一個永遠等待的 Promise</button>
+                </div>
+
+                 <div id="status-box-2" class="status-box status-pending">
+                    狀態: ⏳ 等待中 (Pending)
+                </div>
+            </div>
+
+            <!-- 步驟三：React Suspense 模擬 -->
+            <div class="step-card">
+                <div class="flex items-start">
+                    <div class="step-number">3</div>
+                    <div>
+                        <h2 class="text-3xl font-bold mb-2">終極應用：React Suspense 的魔法</h2>
+                        <p class="text-gray-600">React Suspense 是一個聰明的機制。當一個元件在渲染時需要等待非同步資料，它可以「暫停」渲染，並顯示一個備用的載入畫面 (Fallback UI)。</p>
+                        <p class="mt-2">它的工作原理是：如果一個元件在渲染過程中「丟出 (throw)」一個 Promise，Suspense 就會捕捉到它，然後等待這個 Promise 完成。 </p>
+                    </div>
+                </div>
+                
+                 <div class="code-block">
+                    <pre><code>function MyComponent() {
+  const data = useData(); // 假設這個 Hook 在資料未準備好時...
+  return &lt;div&gt;{data}&lt;/div&gt;;
+}
+
+function useData() {
+  if (!dataIsReady) {
+    // ...就丟出一個 Promise 來「暫停」渲染！
+    throw new Promise(resolve => { /* ...去載入資料... */ });
+  }
+  return data;
+}
+
+// React 會像這樣處理
+&lt;Suspense fallback={&lt;LoadingSpinner /&gt;}&gt;
+  &lt;MyComponent /&gt;
+&lt;/Suspense&gt;
+</code></pre>
+                </div>
+
+                <p class="font-bold text-lg mt-6">現在，讓我們來看看當我們丟出「永遠等待的 Promise」時會發生什麼事：</p>
+
+                <div class="suspense-container">
+                    <h3 class="text-2xl font-bold text-center text-indigo-700 mb-4">React Suspense 模擬器</h3>
+                    <div id="suspense-demo-area" class="text-center bg-white p-6 rounded-lg shadow-inner min-h-[150px] flex items-center justify-center">
+                        <p class="text-gray-500">點擊下方按鈕開始渲染元件</p>
+                    </div>
+                    <div class="flex justify-center flex-wrap mt-6">
+                        <button class="button" onclick="runSuspenseDemo(false)">渲染「會完成」的元件</button>
+                        <button class="button button-negative" onclick="runSuspenseDemo(true)">渲染「永遠等待」的元件</button>
+                         <button class="button button-secondary" onclick="resetSuspenseDemo()">重設</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 總結 -->
+            <div class="step-card bg-blue-50 border-blue-200">
+                <div class="flex items-start">
+                    <div class="step-number">🎉</div>
+                     <div>
+                        <h2 class="text-3xl font-bold mb-2">總結</h2>
+                        <p class="text-gray-700">
+                            `throw new Promise(() => {});` 這行程式碼的威力在於：
+                        </p>
+                        <ul class="list-disc list-inside mt-4 space-y-2 text-lg">
+                            <li>它建立了一個<strong class="text-blue-600">永遠不會結束的 Promise</strong>。</li>
+                            <li>當在 React 元件中<strong class="text-blue-600">丟出 (throw)</strong> 這個 Promise 時...</li>
+                            <li>React Suspense 會捕捉到它，並忠實地<strong class="text-blue-600">永遠顯示 Fallback 載入畫面</strong>。</li>
+                        </ul>
+                        <p class="mt-4 text-gray-700">這是一種強大的技巧，可以用於某些特殊場景，例如在 Storybook 中展示元件的載入狀態，或者在特定情況下故意讓一部分 UI 保持在載入中。現在，您已經完全掌握這個概念了！</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- 步驟一 腳本 ---
+        const statusBox1 = document.getElementById('status-box-1');
+
+        function runNormalPromise(shouldResolve) {
+            statusBox1.className = 'status-box status-pending';
+            statusBox1.innerHTML = '狀態: ⏳ 等待中 (Pending)';
+
+            const normalPromise = new Promise((resolve, reject) => {
+                // 模擬一個網路請求，延遲 1.5 秒
+                setTimeout(() => {
+                    if (shouldResolve) {
+                        resolve("資料回來了！");
+                    } else {
+                        reject("伺服器出錯了！");
+                    }
+                }, 1500);
+            });
+
+            normalPromise
+                .then(result => {
+                    statusBox1.className = 'status-box status-fulfilled';
+                    statusBox1.innerHTML = `狀態: ✅ 成功 (Fulfilled) <br><small class="font-normal">${result}</small>`;
+                })
+                .catch(error => {
+                    statusBox1.className = 'status-box status-rejected';
+                    statusBox1.innerHTML = `狀態: ❌ 失敗 (Rejected) <br><small class="font-normal">${error}</small>`;
+                });
+        }
+
+        // --- 步驟二 腳本 ---
+        const statusBox2 = document.getElementById('status-box-2');
+        function createEndlessPromise() {
+            statusBox2.className = 'status-box status-pending';
+            statusBox2.innerHTML = '狀態: ⏳ 永遠等待中... (Forever Pending)';
+            
+            // 這就是那個永遠不會改變狀態的 Promise
+            const endlessPromise = new Promise(() => {});
+
+            // 因為它永遠不會 resolve 或 reject，所以 .then 或 .catch 永遠不會被觸發
+            endlessPromise.then(() => {
+                // 這段程式碼永遠不會執行
+                statusBox2.innerHTML = '這不可能發生！';
+            });
+        }
+
+        // --- 步驟三 腳本 ---
+        const suspenseArea = document.getElementById('suspense-demo-area');
+        const fallbackUI = `
+            <div class="fallback-ui">
+                <div class="spinner"></div>
+                <p class="font-bold text-lg">正在載入資料，請稍候...</p>
+            </div>`;
+        const successUI = `
+            <div class="text-center text-green-600">
+                <h4 class="text-2xl font-bold">🎉 元件載入成功！</h4>
+                <p>這是您等待的資料內容。</p>
+            </div>`;
+        const initialUI = `<p class="text-gray-500">點擊下方按鈕開始渲染元件</p>`;
+        
+        // 模擬一個會丟出 Promise 的元件
+        function dataFetchingComponent(shouldBeEndless) {
+            if (shouldBeEndless) {
+                // 丟出永遠等待的 Promise
+                throw new Promise(() => {});
+            } else {
+                // 丟出一個 2 秒後會完成的 Promise
+                throw new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve("成功資料");
+                    }, 2000);
+                });
+            }
+        }
+
+        // 模擬 React Suspense 的運作
+        function runSuspenseDemo(isEndless) {
+            suspenseArea.innerHTML = '準備渲染元件...';
+            
+            // 等待一小段時間讓使用者看到訊息
+            setTimeout(() => {
+                try {
+                    // 嘗試渲染元件，這會立即丟出一個 Promise
+                    dataFetchingComponent(isEndless); 
+                    // 因為上面一定會 throw，所以這行不會執行
+                    suspenseArea.innerHTML = successUI;
+                } catch (error) {
+                    // 檢查丟出來的是不是 Promise (Suspense 的核心)
+                    if (error instanceof Promise) {
+                        suspenseArea.innerHTML = fallbackUI; // 顯示載入畫面
+                        
+                        // 等待 Promise 完成
+                        error
+                            .then(() => {
+                                // Promise 完成後，顯示成功畫面
+                                suspenseArea.innerHTML = successUI;
+                            })
+                            .catch(() => {
+                                // 在這個範例中我們不處理 reject
+                            });
+                    }
+                }
+            }, 200);
+        }
+
+        function resetSuspenseDemo() {
+            suspenseArea.innerHTML = initialUI;
+        }
+
+    </script>
+
+</body>
+</html>
+
